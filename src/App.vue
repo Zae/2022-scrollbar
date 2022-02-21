@@ -1,4 +1,13 @@
 <template>
+    <a href="https://github.com/Zae/2022-scrollbar" target="_blank" rel="noreferrer noopener">
+        <img
+            loading="lazy"
+            width="149"
+            height="149"
+            src="https://github.blog/wp-content/uploads/2008/12/forkme_left_darkblue_121621.png?resize=149%2C149"
+            class="github__forkme" alt="Fork me on GitHub"
+        />
+    </a>
     <ScrollBar />
 
     <nav aria-label="HOOFDMENU">
@@ -201,5 +210,12 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
+.github__forkme {
+    position: fixed;
+    top: 0;
+    left: 0;
+    transform: scale(0.5, 0.5);
+    transform-origin: top left;
+}
 </style>
