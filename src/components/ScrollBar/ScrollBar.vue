@@ -211,7 +211,7 @@ export default {
 
 <style scoped>
 button {
-    -webkit-appearance: none;
+    appearance: none;
     background: #fff;
     border-radius: 0;
     padding: 2px 5px;
