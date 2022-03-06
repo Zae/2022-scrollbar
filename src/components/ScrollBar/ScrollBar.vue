@@ -81,6 +81,8 @@ export default {
     destroyed() {
         window.removeEventListener('scroll', this.onScroll);
         window.removeEventListener('mousemove', this.onMouseMove);
+        window.removeEventListener('resize', this.onResize);
+
         this.intersectionObserver.disconnect();
         this.mutationObserver.disconnect();
     },
