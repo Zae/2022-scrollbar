@@ -89,11 +89,11 @@ export default {
     mounted() {
         this.$refs.outline.addEventListener('mouseover', debounce(() => {
             this.mouseover = true;
-        }), 100);
+        }, 100));
 
         this.$refs.outline.addEventListener('mouseleave', debounce(() => {
             this.mouseover = false;
-        }), 1000);
+        }, 1000));
 
         this.rebuildElements();
     },
