@@ -5,56 +5,71 @@
         :class="{ visible: isVisible }"
     >
         <section class="nav">
-            <button :class="{ visible: this.tab === 'headings' }" @click="this.tab = 'headings'">HEADINGS</button>
-            <button :class="{ visible: this.tab === 'navs' }" @click="this.tab = 'navs'">NAVS</button>
+            <button :class="{ visible: isTab('headings') }" @click="switchTab('headings')">HEADINGS</button>
+            <button :class="{ visible: isTab('navs') }" @click="switchTab('navs')">NAVS</button>
         </section>
-        <section v-if="tab === 'headings'" data-tab="headings">
+
+        <section class="tab" v-if="isTab('headings')" data-tab="headings">
             <span
-                v-for="[element, node] in headings"
-                :key="element"
-                v-text="node.title"
+                v-for="(node, key) in headings"
+                :key="key"
+                v-text="node && node.title"
+                :title="node && node.title"
                 class="node"
-                :class="{ visible: node.visible }"
-                :style="`top: ${node.pagePosition}%`"
-                @click="onClick(element)"
+                :class="{ visible: node && node.visible, enabled: node }"
+                @click="onClick(node && node.element)"
             />
         </section>
-        <section v-if="tab === 'navs'" data-tab="nav">
+
+        <section class="tab" v-if="isTab('navs')" data-tab="nav">
             <span
-                v-for="[element, node] in navs"
-                :key="element"
-                v-text="node.title"
+                v-for="(node, key) in navs"
+                :key="key"
+                v-text="node && node.title"
+                :title="node && node.title"
                 class="node"
-                :class="{ visible: node.visible }"
-                :style="`top: ${node.pagePosition}%`"
-                @click="onClick(element)"
+                :class="{ visible: node && node.visible, enabled: node }"
+                @click="onClick(node && node.element)"
             />
         </section>
     </aside>
 </template>
 
 <script>
-import { debounce, throttle } from 'lodash';
+import debounce from 'lodash/debounce';
+import throttle from 'lodash/throttle';
+
+const slotHeight = 15;
 
 export default {
+    props: {
+        headingsSelector: {
+            type: String,
+            default: 'h1, h2, h3, h4, h5, h6'
+        },
+        navSelector: {
+            type: String,
+            default: 'nav'
+        }
+    },
     data() {
         return {
             tab: 'headings',
-            headings: null,
-            navs: null,
+            headings: [],
+            navs: [],
             showNav: false,
             mouseover: false,
             intersectionObserver: null,
-            mutationObserver: null
+            mutationObserver: null,
+            slotHeight,
+            headingsSlots: Math.floor(window.innerHeight / slotHeight),
+            navSlots: Math.floor(window.innerHeight / slotHeight)
         };
     },
     created() {
-        window.addEventListener('scroll', this.onScroll,{
-            passive: true
-        });
-        window.addEventListener('mousemove', this.onMouseMove,{
-            passive: true
-        });
+        window.addEventListener('scroll', this.onScroll,{ passive: true });
+        window.addEventListener('mousemove', this.onMouseMove,{ passive: true });
+        window.addEventListener('resize', this.onResize,{ passive: true });
 
         this.intersectionObserver = new IntersectionObserver(this.onIntersectionObserve);
         this.mutationObserver = new MutationObserver(this.onMutationObserve);
@@ -104,50 +119,44 @@ export default {
             return element.textContent.substring(0, 100);
         },
         rebuildElements() {
-            const headings = document.querySelectorAll('h1,h2,h3,h4,h5,h6');
-
-            this.headings = new Map();
+            this.headings = [];
+            const headings = document.querySelectorAll(this.headingsSelector);
             Array.from(headings).forEach(element => {
                 this.intersectionObserver.observe(element);
 
                 const title = this.getTitleForElement(element);
-                const position = element.getBoundingClientRect().top + window.scrollY;
+                const slot = Math.floor((element.getBoundingClientRect().top / document.body.clientHeight) * this.headingsSlots);
 
-                this.headings.set(element, {
+                this.headings[slot] = {
                     element,
                     title,
-                    position,
-                    pagePosition: (position / (document.body.clientHeight * 1.025) * 100) + 0.8,
                     visible: false
-                });
+                };
             });
 
-            const navs = document.querySelectorAll('nav');
-
-            this.navs = new Map();
+            this.navs = [];
+            const navs = document.querySelectorAll(this.navSelector);
             Array.from(navs).forEach(element => {
                 this.intersectionObserver.observe(element);
 
                 const title = this.getTitleForElement(element);
-                const position = element.getBoundingClientRect().top + window.scrollY;
+                const slot = Math.floor((element.getBoundingClientRect().top / document.body.clientHeight) * this.navSlots);
 
-                this.navs.set(element, {
+                this.navs[slot] = {
                     element,
                     title,
-                    position,
-                    pagePosition: (position / (document.body.clientHeight * 1.025) * 100) + 0.8,
                     visible: false
-                });
+                };
             });
         },
         onIntersectionObserve(entries) {
             entries.forEach(({ isIntersecting, target }) => {
-                const heading = this.headings.get(target);
-                if (heading) {
-                    heading.visible = isIntersecting;
+                const header = this.headings.filter(v => v).find(node => node.element === target);
+                if (header) {
+                    header.visible = isIntersecting;
                 }
 
-                const nav = this.navs.get(target);
+                const nav = this.navs.filter(v => v).find(node => node.element === target);
                 if (nav) {
                     nav.visible = isIntersecting;
                 }
@@ -169,12 +178,26 @@ export default {
                  this.navHide();
              }
         }, 100),
-        onClick(element) {
-            element.scrollIntoView({ behavior: 'smooth' });
+        onResize: debounce(function() {
+            this.calculateSlots();
+            this.rebuildElements();
+        }, 500),
+        onClick(element = null) {
+            element?.scrollIntoView({ behavior: 'smooth' });
         },
         navHide: debounce(function() {
             this.showNav = false;
-        }, 2000)
+        }, 2000),
+        calculateSlots() {
+            this.headingsSlots = Math.floor(window.innerHeight / slotHeight);
+            this.navSlots = Math.floor(window.innerHeight / slotHeight);
+        },
+        switchTab(tab) {
+            this.tab = tab;
+        },
+        isTab(tab){
+            return this.tab === tab;
+        }
     },
     computed: {
         isVisible() {
@@ -194,6 +217,7 @@ button {
 }
 
 .nav {
+    position: absolute;
     transform: rotate(90deg);
     transform-origin: top left;
 
@@ -240,28 +264,32 @@ button.visible {
     width: 20%;
 }
 
+.tab {
+    position: relative;
+    top: 5px;
+}
+
 .node {
+    display: block;
     box-sizing: border-box;
-    position: absolute;
-    font-size: 12px;
-    line-height: 1;
+    width: 100%;
+    height: calc(v-bind(slotHeight) * 1px);
     margin: 0;
     padding: 0 10px;
+    font-size: 12px;
+    line-height: 1;
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
+    color: rgba(0, 0,0, 0.8);
+}
 
-    width: 100%;
-
-    display: inline-block;
-    /*background-color: white;*/
-
-    color: rgba(0,0,0, 0.8);
+.node.enabled {
     cursor: pointer;
 }
 
 .node.visible {
-    color: rgba(0,0,0, 1);
+    color: rgba(0, 0, 0, 1);
     font-weight: bold;
 }
 </style>
